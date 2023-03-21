@@ -1,7 +1,7 @@
 import configparser
 import os
-from discord import (ActivityType, ApplicationContext, Bot, Embed,
-                     EmbedField, Member, Option, Permissions, Button, PartialEmoji, Game, File, Intents)
+from discord import (Activity, ActivityType, ApplicationContext, Bot, Embed,
+                     EmbedField, FFmpegPCMAudio, Member, Option, Permissions, Button, PartialEmoji, Game, File, Intents, utils)
 import youtube_dl
 
 config = configparser.ConfigParser()
@@ -21,39 +21,39 @@ queue = []
 @bot.event
 async def on_ready():
     print(f'{bot.user} Music is connected')
-    await bot.change_presence(activity=ActivityType.listening('Musik auf Game Town'))
+    await bot.change_presence(activity=Activity(type=ActivityType.listening, name="Musik auf Game Town"))
 
 
-# @bot.command(name='play', help='Play a song from YouTube')
-# async def play(ctx, url):
-#     global queue
-#     song = os.path.isfile('song.mp3')
-#     try:
-#         if song:
-#             os.remove('song.mp3')
-#     except PermissionError:
-#         await ctx.send('Wait for the current playing music to end or use the stop command.')
-#         return
+@bot.slash_command(description="Spiele deinen Song")
+async def play(interaction: ApplicationContext, url):
+    global queue
+    song = os.path.isfile('song.mp3')
+    try:
+        if song:
+            os.remove('song.mp3')
+    except PermissionError:
+        await interaction.send('Warte bist der Song zuende ist oder benutze **/next** für das nächste Lied.')
+        return
 
-#     voice_channel = discord.utils.get(
-#         ctx.guild.voice_channels, name='YOUR_VOICE_CHANNEL')
-#     await voice_channel.connect()
-#     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    voice_channel = utils.get(
+        interaction.guild.voice_channels, name='YOUR_VOICE_CHANNEL')
+    await voice_channel.connect()
+    voice = utils.get(bot.voice_clients, guild=interaction.guild)
 
-#     ydl_opts = {
-#         'format': 'bestaudio/best',
-#         'quiet': True,
-#         'outtmpl': 'song.mp3',
-#         'postprocessors': [{
-#             'key': 'FFmpegExtractAudio',
-#             'preferredcodec': 'mp3',
-#             'preferredquality': '192'
-#         }]
-#     }
-#     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-#         ydl.download([url])
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'quiet': True,
+        'outtmpl': 'song.mp3',
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192'
+        }]
+    }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
 
-#     voice.play(discord.FFmpegPCMAudio('song.mp3'))
+    voice.play(FFmpegPCMAudio('song.mp3'))
 
 
 # @bot.command(name='stop', help='Stop the bot and leave the voice channel')
