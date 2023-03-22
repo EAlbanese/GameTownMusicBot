@@ -3,6 +3,7 @@ import os
 from discord import (Activity, ActivityType, ApplicationContext, Bot, Embed,
                      EmbedField, FFmpegPCMAudio, Member, Option, Permissions, Button, PartialEmoji, Game, File, Intents, utils)
 import youtube_dl
+import yt_dlp
 
 config = configparser.ConfigParser()
 config.read("config.ini")
@@ -36,22 +37,30 @@ async def play(interaction: ApplicationContext, url):
         return
 
     voice_channel = utils.get(
-        interaction.guild.voice_channels, name='YOUR_VOICE_CHANNEL')
+        interaction.guild.voice_channels, name='🎧⟫Radio Stage')
     await voice_channel.connect()
     voice = utils.get(bot.voice_clients, guild=interaction.guild)
 
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'quiet': True,
-        'outtmpl': 'song.mp3',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192'
-        }]
-    }
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
+    # ydl_opts = {
+    #     'format': 'bestaudio/best',
+    #     'quiet': True,
+    #     'outtmpl': 'song.mp3',
+    #     'postprocessors': [{
+    #         'key': 'FFmpegExtractAudio',
+    #         'preferredcodec': 'mp3',
+    #         'preferredquality': '192'
+    #     }]
+    # }
+    # with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+    #     ydl.download([url])
+
+    ffmpeg_options = {'options': '-vn'}
+    ydl_opts = {'format': 'bestaudio'}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        song_info = ydl.extract_info(url, download=False)
+
+    interaction.voice_client.play(
+        FFmpegPCMAudio(song_info[url], **ffmpeg_options))
 
     voice.play(FFmpegPCMAudio('song.mp3'))
 
