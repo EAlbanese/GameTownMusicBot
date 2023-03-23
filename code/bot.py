@@ -1,3 +1,4 @@
+from asyncio import sleep
 import configparser
 import os
 from discord import (Activity, ActivityType, ApplicationContext, Bot, Embed,
@@ -24,61 +25,63 @@ async def on_ready():
     print(f'{bot.user} Music is connected')
     await bot.change_presence(activity=Activity(type=ActivityType.listening, name="Musik auf Game Town"))
 
-
-@bot.slash_command(description="Spiele deinen Song")
-async def play(interaction: ApplicationContext, url):
-    global queue
-    song = os.path.isfile('song.mp3')
-    try:
-        if song:
-            os.remove('song.mp3')
-    except PermissionError:
-        await interaction.send('Warte bist der Song zuende ist oder benutze **/next** für das nächste Lied.')
-        return
-
-    voice_channel = utils.get(
-        interaction.guild.voice_channels, name='🎧⟫Radio Stage')
-    await voice_channel.connect()
-    voice = utils.get(bot.voice_clients, guild=interaction.guild)
-
-    # ydl_opts = {
-    #     'format': 'bestaudio/best',
-    #     'quiet': True,
-    #     'outtmpl': 'song.mp3',
-    #     'postprocessors': [{
-    #         'key': 'FFmpegExtractAudio',
-    #         'preferredcodec': 'mp3',
-    #         'preferredquality': '192'
-    #     }]
-    # }
-    # with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-    #     ydl.download([url])
-
-    ffmpeg_options = {'options': '-vn'}
-    ydl_opts = {'format': 'bestaudio'}
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        song_info = ydl.extract_info(url, download=False)
-
-    interaction.voice_client.play(
-        FFmpegPCMAudio(song_info[url], **ffmpeg_options))
-
-    voice.play(FFmpegPCMAudio('song.mp3'))
+# Setzt die Konfigurationsoptionen für den YoutubeDL-Wrapper
+ytdl_format_options = {
+    'format': 'bestaudio/best',
+    'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+    'restrictfilenames': True,
+    'noplaylist': True,
+    'nocheckcertificate': True,
+    'ignoreerrors': False,
+    'logtostderr': False,
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'auto',
+    'source_address': '0.0.0.0'
+}
+ffmpeg_options = {
+    'options': '-vn'
+}
+ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
 
-# @bot.command(name='stop', help='Stop the bot and leave the voice channel')
-# async def stop(ctx):
-#     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-#     if voice.is_connected():
-#         await voice.disconnect()
-#     else:
-#         await ctx.send('The bot is not connected to a voice channel.')
+# Eine Funktion zum Streamen von Musik von einem YouTube-Link
+def get_url(query):
+    with ytdl:
+        try:
+            url = ytdl.extract_info(query, download=False)['url']
+            return url
+        except:
+            return None
 
 
-# @bot.command(name='addtoqueue', help='Add a song to the queue')
-# async def addtoqueue(ctx, url):
-#     global queue
-#     queue.append(url)
-#     await ctx.send(f'The song has been added to the queue. There are {len(queue)} songs in queue.')
+# Eine Funktion, um eine Audioverbindung herzustellen und Musik abzuspielen
+async def play_audio(interaction: ApplicationContext, url):
+    voice_channel = interaction.author.voice.channel
+    vc = await voice_channel.connect()
+    vc.play(FFmpegPCMAudio(url, **ffmpeg_options))
+    while vc.is_playing():
+        await sleep(1)
+    await vc.disconnect()
+
+
+# Der Bot-Befehl, um Musik abzuspielen
+@bot.slash_command(description="Spiele ein Lied ab")
+async def play(interaction: ApplicationContext, query):
+    url = get_url(query)
+    if url:
+        await play_audio(interaction, url)
+    else:
+        await interaction.send("Konnte keinen Song finden.")
+
+
+# Der Bot-Befehl, um den Bot aus dem Sprachkanal zu entfernen
+@bot.slash_command(description="Stoppe den Bot")
+async def stop(interaction: ApplicationContext):
+    voice_client = interaction.message.guild.voice_client
+    if voice_client.is_connected():
+        await voice_client.disconnect()
+
 
 bot.run(TOKEN)
 # db.connection.close()
